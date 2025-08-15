@@ -1,0 +1,48 @@
+import sqlite3
+import requests
+import datetime
+import time
+from bs4 import BeautifulSoup
+
+
+URL = "https://www.gismeteo.ru/weather-baku-5131/"
+
+
+conn = sqlite3.connect("weather.db")
+cursor = conn.cursor()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS weather (
+    datetime TEXT,
+    temperature TEXT
+)
+""")
+conn.commit()
+
+def get_temperature():
+
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(URL, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+    
+
+    temp_tag = soup.find("span", class_="unit unit_temperature_c")
+    return temp_tag.text.strip() if temp_tag else None
+
+def save_to_db(temp):
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("INSERT INTO weather (datetime, temperature) VALUES (?, ?)", (now, temp))
+    conn.commit()
+    print(f"[{now}] Температура: {temp}°C — сохранено в БД")
+
+
+try:
+    while True:
+        temperature = get_temperature()
+        if temperature:
+            save_to_db(temperature)
+        else:
+            print("Не удалось получить температуру.")
+        time.sleep(1800)  
+except KeyboardInterrupt:
+    print("остановлена.")
+    conn.close()
